@@ -1,22 +1,57 @@
 # -*- coding: utf8 -*-
 from lxml import etree, html
-import requests
+import requests, json
+from time import sleep
 
 def main():
     depts = getDepts()
-    print(depts)
+    rawData = []
+    for dept in depts:
+        course = getCourse(dept['value'], '1')
+        deptData = {}
+        deptData['科系'] = dept['name']
+        if course != "no data":
+            deptData['課程'] = course
+        rawData.append(deptData)
+    print(json.dumps(rawData, ensure_ascii=False))
+
+def getCharset(root):
+    meta = root.xpath("//head/meta")[0]
+    return meta.get('content').split('=')[-1]
 
 def getDepts():
     result = requests.get("https://www.mcu.edu.tw/student/new-query/sel-query/query_3_up.asp")
     root = etree.fromstring(result.text, etree.HTMLParser())
-    meta = root.xpath("//head/meta")[0]
-    charset = meta.get('content').split('=')[-1]
-    result.encoding = charset
+    result.encoding = getCharset(root)
     depts = root.xpath("//select[@name='dept']/option")
     deptsMap = []
     for dept in depts:
-        deptsMap.append({'name': dept.text.strip().split(' - ')[1].encode('latin1').decode('big5'), 'value': dept.get('value')})
+        deptsMap.append({'name': latinToBig5(dept.text.strip().split(' - ')[1]), 'value': dept.get('value').strip()})
     return deptsMap
 
+def getCourse(dept, year):
+    courses = []
+    result = requests.get("https://www.mcu.edu.tw/student/new-query/sel-query/query_3_1.asp", data={'dept': dept, 'yr': year})
+    root = etree.fromstring(result.text, etree.HTMLParser())
+    result.encoding = getCharset(root)
+    table = root.xpath("//table/tr")
+    if len(table) == 0:
+        return 'no data'
+    headers = table[0].xpath("./td/font")
+    for row in table[1:]:
+        columns = row.xpath("./td/font | ./td/a/font")
+        tmp = {}
+        for i in range(len(columns)):
+            if type(columns[i].text).__name__ == "NoneType":
+                tmp[latinToBig5(headers[i].text)] = ""
+            else:
+                tmp[latinToBig5(headers[i].text)] = latinToBig5(columns[i].text.strip())
+        courses.append(tmp)
+    sleep(0.5)
+    return courses
+
+def latinToBig5(s):
+    return s.encode('latin1').decode('big5')
+        
 if __name__ == "__main__":
     main()
