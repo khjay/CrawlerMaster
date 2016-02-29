@@ -48,7 +48,7 @@ def getCourse(dept):
             else:
                 tmp[latinToBig5(headers[i].text)] = latinToBig5(columns[i].text.strip())
         courses.append(tmp)
-    sleep(1.5)
+    sleep(1)
     return courses
 
 def latinToBig5(s):
