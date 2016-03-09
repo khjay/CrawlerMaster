@@ -1,25 +1,40 @@
 # -*- coding: utf8 -*-
 from lxml import etree, html
-import requests, threading
+import requests, threading, uuid, time
 
 class axe(threading.Thread):
-    def __init__(self):
+    jsonData = ""
+    def __init__(self, url, cookies):
+        self.url = url
+        self.cookies = cookies
         threading.Thread.__init__(self)
     def run(self):
-        pass
+        result = requests.post(self.url, cookies=self.cookies)
+        result.encoding = 'utf-8'
+        self.jsonData = retriveToJson(result)
+#         print(self.jsonData)
     
 def main():
-    jsonData = '['
-    result = requests.get("http://axe-level-1.herokuapp.com/lv3/")
-    result.encoding='utf-8'
-    cookies = result.cookies
-    jsonData += retriveToJson(result)
+    cookies = {'PHPSESSID': str(uuid.uuid4())}
+    print("loading page 1")    
+    axeList = []
+    worker = axe("http://axe-level-1.herokuapp.com/lv3/", cookies)
+    worker.start()
+    axeList.append(worker)
     for i in range(1, 76):
-        result = requests.post("http://axe-level-1.herokuapp.com/lv3/?page=next", cookies=cookies)
-        result.encoding = 'utf-8'
-        jsonData += retriveToJson(result)
-    print(jsonData[0:-1] + "]")
-
+        print("loading page %d" % (i+1))
+        worker = axe("http://axe-level-1.herokuapp.com/lv3/?page=next", cookies=cookies)
+        worker.start()
+        axeList.append(worker)
+        time.sleep(0.3)
+    
+    allData = '['
+    for i in range(len(axeList)):
+        axeList[i].join()
+        allData += axeList[i].jsonData
+    print(allData[0: -1] + "]")
+        
+        
 def retriveToJson(result):
     root = etree.fromstring(result.text, etree.HTMLParser())
     tmp = ""
